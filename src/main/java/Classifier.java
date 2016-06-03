@@ -36,12 +36,7 @@ import java.util.Random;
 
 public class Classifier {
 
-
-
-
-
         public static void main (String[] args) throws IOException, InterruptedException {
-
 
             // Initialized parameters
 
@@ -58,7 +53,6 @@ public class Classifier {
             int iterations = 2;
             int epochs = 30;
             int splitTrainCount = 20;
-
 
             // File and labels
 
@@ -144,7 +138,6 @@ public class Classifier {
 
             // Train model on defined training data for the defined number of epochs
 
-
             for (int i = 0; i < epochs; i++) {
                 for(int j = 0; j < trainIter.size(); j++){
                     model.fit(trainIter.get(j));
@@ -170,6 +163,5 @@ public class Classifier {
             FileUtils.writeStringToFile(new File(confPath), model.getLayerWiseConfigurations().toJson());
 
         }
-
 
 }
