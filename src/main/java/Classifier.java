@@ -18,6 +18,7 @@ import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.deeplearning4j.nn.conf.layers.setup.ConvolutionLayerSetup;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.deeplearning4j.ui.weights.HistogramIterationListener;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.SplitTestAndTrain;
@@ -41,14 +42,13 @@ public class Classifier {
             // Initialized parameters
 
             int seed = 123;
-            int height = 50;
-            int width = 50;
+            int height = 100;
+            int width = 100;
             int wByH = width * height;
-            int channels = 3;
             int numExamples = 83;
             int outputNum = 4;
             int batchSize = 10;
-            int listenerFreq = 5;
+            int listenerFreq = 1;
             boolean appendLabels = true;
             int iterations = 2;
             int epochs = 30;
@@ -62,7 +62,7 @@ public class Classifier {
 
             // Load in Images to record reader, turn into a single data set to be split
 
-            RecordReader recordReader = new ImageRecordReader(width, height, true, labels);
+            RecordReader recordReader = new ImageRecordReader(width, height, appendLabels, labels);
             recordReader.initialize(new FileSplit(f));
 
             // Make a single data set to be normalized and then split
@@ -80,17 +80,16 @@ public class Classifier {
             MultiLayerConfiguration.Builder builder = new NeuralNetConfiguration.Builder()
                     .seed(seed)
                     .iterations(iterations)
-                    .learningRate(0.00001)//.biasLearningRate(0.02)
-                    .regularization(true).l2(.005)
-                    //.learningRateDecayPolicy(LearningRatePolicy.Inverse).lrPolicyDecayRate(0.001).lrPolicyPower(0.75)
+                    .learningRate(0.00001)
+                    .regularization(true).dropOut(.5).l1(.005)
                     .weightInit(WeightInit.XAVIER)
                     .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                    .updater(Updater.NESTEROVS).momentum(0.9)
+                    .updater(Updater.NESTEROVS).momentum(0.5)
                     .list(8)
                     .layer(0, new ConvolutionLayer.Builder(5, 5)
                             .nIn(wByH)
                             .stride(1, 1)
-                            .nOut(20)
+                            .nOut(25)
                             .activation("identity")
                             .build())
                     .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
@@ -110,7 +109,7 @@ public class Classifier {
                     .layer(4, new ConvolutionLayer.Builder(5, 5)
                             .nIn(wByH)
                             .stride(1, 1)
-                            .nOut(75)
+                            .nOut(150)
                             .activation("identity")
                             .build())
                     .layer(5, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
@@ -118,7 +117,7 @@ public class Classifier {
                             .stride(2, 2)
                             .build())
                     .layer(6, new DenseLayer.Builder().activation("relu")
-                            .nOut(500).build())
+                            .nOut(1000).build())
                     .layer(7, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                             .nOut(outputNum)
                             .activation("softmax")
@@ -134,10 +133,9 @@ public class Classifier {
 
             // Create a histogram listener to visualize learning
 
-           model.setListeners(new HistogramIterationListener(listenerFreq));
+           model.setListeners(new ScoreIterationListener(listenerFreq));
 
             // Train model on defined training data for the defined number of epochs
-
             for (int i = 0; i < epochs; i++) {
                 for(int j = 0; j < trainIter.size(); j++){
                     model.fit(trainIter.get(j));
