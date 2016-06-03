@@ -31,8 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
-
-
+import java.util.Random;
 
 
 public class Classifier {
@@ -58,7 +57,7 @@ public class Classifier {
             boolean appendLabels = true;
             int iterations = 2;
             int epochs = 30;
-            double splitTrainPerc = .8;
+            int splitTrainCount = 20;
 
 
             // File and labels
@@ -77,7 +76,7 @@ public class Classifier {
             DataSetIterator allDataIterator = new RecordReaderDataSetIterator(recordReader, numExamples, wByH, outputNum);
             DataSet allData = allDataIterator.next();
             allData.normalizeZeroMeanZeroUnitVariance();
-            SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(splitTrainPerc);
+            SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(splitTrainCount,new Random(seed));
             DataSet train = testAndTrain.getTrain();
             List<DataSet> trainIter = train.batchBy(batchSize);
             DataSet test = testAndTrain.getTest();
