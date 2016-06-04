@@ -11,10 +11,7 @@ import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.Updater;
-import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
-import org.deeplearning4j.nn.conf.layers.DenseLayer;
-import org.deeplearning4j.nn.conf.layers.OutputLayer;
-import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
+import org.deeplearning4j.nn.conf.layers.*;
 import org.deeplearning4j.nn.conf.layers.setup.ConvolutionLayerSetup;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
@@ -42,17 +39,17 @@ public class Classifier {
             // Initialized parameters
 
             int seed = 123;
-            int height = 100;
-            int width = 100;
+            int height = 50;
+            int width = 50;
             int wByH = width * height;
             int numExamples = 83;
             int outputNum = 4;
-            int batchSize = 10;
+            int batchSize = 20;
             int listenerFreq = 1;
             boolean appendLabels = true;
             int iterations = 2;
             int epochs = 30;
-            int splitTrainCount = 20;
+            double splitTrainPerc = .8;
 
             // File and labels
 
@@ -70,55 +67,59 @@ public class Classifier {
             DataSetIterator allDataIterator = new RecordReaderDataSetIterator(recordReader, numExamples, wByH, outputNum);
             DataSet allData = allDataIterator.next();
             allData.normalizeZeroMeanZeroUnitVariance();
-            SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(splitTrainCount,new Random(seed));
+            allData.shuffle();
+            SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(splitTrainPerc);
             DataSet train = testAndTrain.getTrain();
             List<DataSet> trainIter = train.batchBy(batchSize);
             DataSet test = testAndTrain.getTest();
+
+            System.out.println(train.labelCounts());
+            System.out.println(test.labelCounts());
 
             // Configure Convo Neural Net with 3 pairs of convo-pooling layers
 
             MultiLayerConfiguration.Builder builder = new NeuralNetConfiguration.Builder()
                     .seed(seed)
                     .iterations(iterations)
-                    .learningRate(0.00001)
-                    .regularization(true).dropOut(.5).l1(.005)
+                    .learningRate(0.0001)
+                    .regularization(true).dropOut(.9).l2(.0001)
                     .weightInit(WeightInit.XAVIER)
                     .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                    .updater(Updater.NESTEROVS).momentum(0.5)
-                    .list(8)
+                    .updater(Updater.NESTEROVS).momentum(0.9)
+                    .list(6)
                     .layer(0, new ConvolutionLayer.Builder(5, 5)
                             .nIn(wByH)
                             .stride(1, 1)
-                            .nOut(25)
+                            .nOut(50)
                             .activation("identity")
                             .build())
-                    .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
+                    .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.AVG)
                             .kernelSize(2, 2)
                             .stride(2, 2)
                             .build())
                     .layer(2, new ConvolutionLayer.Builder(5, 5)
                             .nIn(wByH)
                             .stride(1, 1)
-                            .nOut(50)
+                            .nOut(100)
                             .activation("identity")
                             .build())
-                    .layer(3, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
+                    .layer(3, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.AVG)
                             .kernelSize(2, 2)
                             .stride(2, 2)
                             .build())
-                    .layer(4, new ConvolutionLayer.Builder(5, 5)
-                            .nIn(wByH)
-                            .stride(1, 1)
-                            .nOut(150)
-                            .activation("identity")
-                            .build())
-                    .layer(5, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
-                            .kernelSize(2, 2)
-                            .stride(2, 2)
-                            .build())
-                    .layer(6, new DenseLayer.Builder().activation("relu")
+//                    .layer(4, new ConvolutionLayer.Builder(5, 5)
+//                            .nIn(wByH)
+//                            .stride(1, 1)
+//                            .nOut(150)
+//                            .activation("identity")
+//                            .build())
+//                    .layer(5, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.AVG)
+//                            .kernelSize(2, 2)
+//                            .stride(2, 2)
+//                            .build())
+                    .layer(4, new DenseLayer.Builder().activation("relu")
                             .nOut(1000).build())
-                    .layer(7, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                    .layer(5, new OutputLayer.Builder(LossFunctions.LossFunction.MCXENT)
                             .nOut(outputNum)
                             .activation("softmax")
                             .build())
@@ -140,6 +141,9 @@ public class Classifier {
                 for(int j = 0; j < trainIter.size(); j++){
                     model.fit(trainIter.get(j));
                 }
+                Evaluation eval = new Evaluation(outputNum);
+                eval.eval(test.getLabels(), model.output(test.getFeatureMatrix(), Layer.TrainingMode.TEST));
+                System.out.println(eval.stats());
             }
 
             // Evaluate model based on defined testing set and print results
