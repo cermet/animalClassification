@@ -42,7 +42,7 @@ public class Classifier {
             int height = 50;
             int width = 50;
             int wByH = width * height;
-            int numExamples = 83;
+            int numExamples = 403;
             int outputNum = 4;
             int batchSize = 20;
             int listenerFreq = 1;

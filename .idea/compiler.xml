@@ -22,11 +22,11 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="true" />
-        <module name="animalClassifier" />
+        <module name="interviewExample" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="animalClassifier" target="1.7" />
+      <module name="interviewExample" target="1.7" />
     </bytecodeTargetLevel>
   </component>
 </project>
