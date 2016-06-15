@@ -48,8 +48,8 @@ public class Classifier {
 
         // Define hyperparameters
 
-        double[] l2Vals = new double[]{0,.005};
-        double[] dropVals = new double[]{0,.5};
+        double[] l2Vals = new double[]{.0001,.0005, .001, .005};
+        double[] dropVals = new double[]{0,.5, .9};
         MultiLayerConfiguration[] models = new MultiLayerConfiguration[l2Vals.length*dropVals.length];
         String[] modelParams = new String[l2Vals.length*dropVals.length];
 
@@ -113,6 +113,7 @@ public class Classifier {
         int maxIndex = 0;
         int maxAvgIndex = 0;
         int[] f1Scores = new int[models.length];
+        data.shuffle();
         List<DataSet> folds = data.batchBy(numExamples/nFolds);
         for(int i = 0; i < nFolds; i++){
             DataSet testData = folds.get(i);
@@ -188,7 +189,7 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(64)
+                        .nOut(128)
                         .build())
                 .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
@@ -197,7 +198,7 @@ public class Classifier {
                 .layer(2, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(128)
+                        .nOut(256)
                         .build())
                 .layer(3, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(2, 2)
@@ -207,25 +208,25 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(256)
+                        .nOut(512)
                         .build())
                 .layer(5, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
                         .biasInit(1)
-                        .nOut(256)
+                        .nOut(512)
                         .build())
                 .layer(6, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
                         .stride(2, 2)
                         .build())
                 .layer(7, new DenseLayer.Builder()
-                        .nOut(1024)
+                        .nOut(2048)
                         .dropOut(dropout)
                         .biasInit(1)
                         .build())
                 .layer(8, new DenseLayer.Builder()
-                        .nOut(1024)
+                        .nOut(2048)
                         .dropOut(dropout)
                         .biasInit(1)
                         .build())
