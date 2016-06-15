@@ -8,9 +8,6 @@
     <artifactId>interviewExample</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-        <name>nd4j-scala-examples</name>
-        <url>http://maven.apache.org</url>
-
         <properties>
             <nd4j.backend>nd4j-native</nd4j.backend>
             <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -30,7 +27,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>${exec-maven-plugin.version}</version>
+                <version>1.4.0</version>
                 <executions>
                     <execution>
                         <goals>
@@ -45,10 +42,8 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>${maven-shade-plugin.version}</version>
+                <version>1.6</version>
                 <configuration>
-                    <shadedArtifactAttached>true</shadedArtifactAttached>
-                    <shadedClassifierName>${shadedClassifier}</shadedClassifierName>
                     <createDependencyReducedPom>true</createDependencyReducedPom>
                     <filters>
                         <filter>
@@ -85,10 +80,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.5.1</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <source>1.7</source>
+                    <target>1.7</target>
                 </configuration>
             </plugin>
         </plugins>

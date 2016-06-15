@@ -1,9 +1,6 @@
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.canova.api.records.reader.RecordReader;
 import org.canova.api.split.FileSplit;
-import org.canova.api.split.LimitFileSplit;
-import org.canova.image.loader.BaseImageLoader;
 import org.canova.image.recordreader.ImageRecordReader;
 import org.deeplearning4j.datasets.canova.RecordReaderDataSetIterator;
 import org.deeplearning4j.datasets.iterator.DataSetIterator;
@@ -14,27 +11,21 @@ import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.Updater;
-import org.deeplearning4j.nn.conf.layers.*;
+import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
+import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.deeplearning4j.nn.conf.layers.setup.ConvolutionLayerSetup;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
-import org.deeplearning4j.ui.weights.HistogramIterationListener;
-import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
-import org.nd4j.linalg.dataset.SplitTestAndTrain;
-import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
-import java.io.DataOutputStream;
+
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 
 
 public class Classifier {
@@ -42,7 +33,7 @@ public class Classifier {
     private static final int seed = 123;
     private static final int height = 64;
     private static final int width = 64;
-    private static final int numExamples = 83;
+    private static final int numExamples = 403;
     private static final int outputNum = 4;
     private static final int channels = 3;
 
@@ -57,8 +48,8 @@ public class Classifier {
 
         // Define hyperparameters
 
-        double[] l2Vals = new double[]{.0001,.0005,.001,.005};
-        double[] dropVals = new double[]{0,.5,.9};
+        double[] l2Vals = new double[]{0,.005};
+        double[] dropVals = new double[]{0,.5};
         MultiLayerConfiguration[] models = new MultiLayerConfiguration[l2Vals.length*dropVals.length];
         String[] modelParams = new String[l2Vals.length*dropVals.length];
 
@@ -75,7 +66,7 @@ public class Classifier {
 
         // File and labels
 
-        String filePath = FilenameUtils.concat(System.getProperty("user.dir"), "animals2");
+        String filePath = FilenameUtils.concat(System.getProperty("user.dir"), "animals");
         File f = new File(filePath);
         List<String> labels = Arrays.asList(f.list());
 
@@ -87,6 +78,7 @@ public class Classifier {
         DataSetIterator allDataIterator = new RecordReaderDataSetIterator(recordReader, numExamples, -1, outputNum);
         DataSet allData = allDataIterator.next();
         allData.normalizeZeroMeanZeroUnitVariance();
+        allData.shuffle();
 
         // Send models and data to cross validation training function
         System.out.println("training...");
@@ -109,8 +101,6 @@ public class Classifier {
         */
     }
 
-
-
     ///////////////////////////////////////
 
     /////////    Helper functions
@@ -123,9 +113,10 @@ public class Classifier {
         int maxIndex = 0;
         int maxAvgIndex = 0;
         int[] f1Scores = new int[models.length];
-        List<DataSet> folds = data.batchBy(nFolds);
+        List<DataSet> folds = data.batchBy(numExamples/nFolds);
         for(int i = 0; i < nFolds; i++){
             DataSet testData = folds.get(i);
+            System.out.println(testData.labelCounts());
             List<DataSet> tempData = folds;
             tempData.remove(i);
             DataSet trainData = DataSet.merge(tempData);
@@ -158,39 +149,28 @@ public class Classifier {
         List<DataSet> trainIter = trainData.batchBy(batchSize);
         MultiLayerNetwork model = new MultiLayerNetwork(conf);
         model.init();
+        model.setListeners(new ScoreIterationListener(3));
 
-        model.setListeners(new ScoreIterationListener(5));
 
         while(f1Counter <= 5){
             for(int j = 0; j < trainIter.size(); j++){
                 model.fit(trainIter.get(j));
-                if(j%5==0) {
-                    Evaluation eval = new Evaluation(outputNum);
-                    eval.eval(testData.getLabels(), model.output(testData.getFeatureMatrix(), Layer.TrainingMode.TEST));
-                    System.out.println(eval.f1());
-                }
             }
             Evaluation eval = new Evaluation(outputNum);
             eval.eval(testData.getLabels(), model.output(testData.getFeatureMatrix(), Layer.TrainingMode.TEST));
             double currF1 = eval.f1();
-            System.out.println("Best = "+f1+"\nand current = "+currF1);
             if(currF1 > f1){
                 f1 = currF1;
                 f1Counter = 0;
             }else f1Counter++;
+            System.out.println("Best = "+f1+"\nand current = "+currF1);
         }
         return f1;
     }
 
-
-
-
     private static MultiLayerConfiguration makeNetwork(double l2Lambda, double dropout) {
 
-        int iterations = 1;
-
         // Configure Convo Neural Net with 3 pairs of convo-pooling layers
-
 
         MultiLayerConfiguration.Builder builder = new NeuralNetConfiguration.Builder()
                 .seed(seed)
@@ -208,7 +188,7 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(32)
+                        .nOut(64)
                         .build())
                 .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
@@ -217,7 +197,7 @@ public class Classifier {
                 .layer(2, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(64)
+                        .nOut(128)
                         .build())
                 .layer(3, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(2, 2)
@@ -227,13 +207,13 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(128)
+                        .nOut(256)
                         .build())
                 .layer(5, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
                         .biasInit(1)
-                        .nOut(128)
+                        .nOut(256)
                         .build())
                 .layer(6, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
@@ -255,11 +235,6 @@ public class Classifier {
                         .build())
                 .backprop(true).pretrain(false).cnnInputSize(height,width,channels);
         new ConvolutionLayerSetup(builder, width, height, channels);
-
-
-
-        // Build configuration into a model for training
-
         MultiLayerConfiguration conf = builder.build();
 
         return conf;
