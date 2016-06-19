@@ -33,7 +33,7 @@ public class Classifier {
     private static final int seed = 123;
     private static final int height = 64;
     private static final int width = 64;
-    private static final int numExamples = 403;
+    private static final int numExamples = 388;
     private static final int outputNum = 4;
     private static final int channels = 3;
 
@@ -58,7 +58,7 @@ public class Classifier {
         int index = 0;
         for(int i = 0; i < l2Vals.length; i++) {
             for (int j = 0; j < dropVals.length; j++) {
-                models[index] = makeNetwork(l2Vals[i], dropVals[j]);
+                models[index] = makeNetwork(l2Vals[i], dropVals[j], 4);
                 modelParams[index] = new String("L2 = " + l2Vals[i] + ", dropout = " + dropVals[j]);
                 index++;
             }
@@ -78,7 +78,6 @@ public class Classifier {
         DataSetIterator allDataIterator = new RecordReaderDataSetIterator(recordReader, numExamples, -1, outputNum);
         DataSet allData = allDataIterator.next();
         allData.normalizeZeroMeanZeroUnitVariance();
-        allData.shuffle();
 
         // Send models and data to cross validation training function
         System.out.println("training...");
@@ -107,12 +106,13 @@ public class Classifier {
 
     ///////////////////////////////////////
 
-    private static int validationTrain(MultiLayerConfiguration[] models, DataSet data, int nFolds, int batchSize,String[] modelParams){
+    private static void validationTrain(MultiLayerConfiguration[] models, DataSet data, int nFolds, int batchSize,String[] modelParams){
         double maxF1 = 0;
         double maxAvgF1 = 0;
         int maxIndex = 0;
         int maxAvgIndex = 0;
         int[] f1Scores = new int[models.length];
+        data.shuffle();
         data.shuffle();
         List<DataSet> folds = data.batchBy(numExamples/nFolds);
         for(int i = 0; i < nFolds; i++){
@@ -140,8 +140,6 @@ public class Classifier {
 
         System.out.println("The winner is model"+maxIndex+" with an F1 score of "+maxF1+" and parameters: "+modelParams[maxIndex]);
         System.out.println("The average winner is model"+maxAvgIndex+" with an F1 score of "+maxAvgF1+" and parameters: "+modelParams[maxIndex]);
-
-        return 0;
     }
 
     private static double trainer(MultiLayerConfiguration conf, DataSet trainData, DataSet testData, int batchSize){
@@ -150,7 +148,7 @@ public class Classifier {
         List<DataSet> trainIter = trainData.batchBy(batchSize);
         MultiLayerNetwork model = new MultiLayerNetwork(conf);
         model.init();
-        model.setListeners(new ScoreIterationListener(3));
+        //model.setListeners(new ScoreIterationListener(30));
 
 
         while(f1Counter <= 5){
@@ -164,12 +162,13 @@ public class Classifier {
                 f1 = currF1;
                 f1Counter = 0;
             }else f1Counter++;
+            System.out.println(eval.stats());
             System.out.println("Best = "+f1+"\nand current = "+currF1);
         }
         return f1;
     }
 
-    private static MultiLayerConfiguration makeNetwork(double l2Lambda, double dropout) {
+    private static MultiLayerConfiguration makeNetwork(double l2Lambda, double dropout, int sizeMultiplier) {
 
         // Configure Convo Neural Net with 3 pairs of convo-pooling layers
 
@@ -189,7 +188,7 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(128)
+                        .nOut(32*sizeMultiplier)
                         .build())
                 .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
@@ -198,7 +197,7 @@ public class Classifier {
                 .layer(2, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(256)
+                        .nOut(64*sizeMultiplier)
                         .build())
                 .layer(3, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(2, 2)
@@ -208,25 +207,25 @@ public class Classifier {
                         .nIn(channels)
                         .stride(1, 1)
                         .padding(1,1)
-                        .nOut(512)
+                        .nOut(128*sizeMultiplier)
                         .build())
                 .layer(5, new ConvolutionLayer.Builder(3, 3)
                         .stride(1, 1)
                         .padding(1,1)
                         .biasInit(1)
-                        .nOut(512)
+                        .nOut(128*sizeMultiplier)
                         .build())
                 .layer(6, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
                         .kernelSize(3, 3)
                         .stride(2, 2)
                         .build())
                 .layer(7, new DenseLayer.Builder()
-                        .nOut(2048)
+                        .nOut(512*sizeMultiplier)
                         .dropOut(dropout)
                         .biasInit(1)
                         .build())
                 .layer(8, new DenseLayer.Builder()
-                        .nOut(2048)
+                        .nOut(512*sizeMultiplier)
                         .dropOut(dropout)
                         .biasInit(1)
                         .build())
